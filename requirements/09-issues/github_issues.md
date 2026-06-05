@@ -1,0 +1,62 @@
+# GitHub Issues
+
+- [v0.1] chore: initialize WXT React TypeScript monorepo `label:chore`
+- [v0.1] feat(schema): add ID and time schema `label:feat`
+- [v0.1] feat(schema): add URL sanitizer and hash utilities `label:feat`
+- [v0.1] feat(schema): add bookmark schema `label:feat`
+- [v0.1] feat(schema): add OrganizeRunRecord schema `label:feat`
+- [v0.1] feat(schema): add OrganizePlan schema `label:feat`
+- [v0.1] feat(schema): add MoveLog schema `label:feat`
+- [v0.1] feat(schema): add Trace and DiagnosticReport schema `label:feat`
+- [v0.1] feat(browser): add BookmarkManagerPort `label:feat`
+- [v0.1] feat(browser): implement ChromiumBookmarkAdapter `label:feat`
+- [v0.1] feat(storage): add StorageRoot and schemaVersion `label:feat`
+- [v0.1] feat(secret): add SecretStorePort `label:feat`
+- [v0.1] feat(ai): add LlmProviderPort `label:feat`
+- [v0.1] feat(ai): implement DeepSeek provider `label:feat`
+- [v0.1] feat(ai): implement OpenAI-compatible provider `label:feat`
+- [v0.1] feat(directory): add default directory fallback `label:feat`
+- [v0.1] feat(bookmarks): read and flatten bookmark tree `label:feat`
+- [v0.1] feat(plan): build and validate OrganizePlan `label:feat`
+- [v0.1] feat(ui): add minimal settings page `label:feat`
+- [v0.1] feat(ui): add minimal organizer and preview page `label:feat`
+- [v0.1] feat(executor): apply selected plan items `label:feat`
+- [v0.1] feat(rollback): add MoveLog rollback `label:feat`
+- [v0.1] feat(trace): add basic TraceEvent recording `label:feat`
+- [v0.1] test(schema): add schema unit tests `label:test`
+- [v0.1] docs: add README and privacy draft `label:docs`
+- [v0.5] feat(flags): add OpenFeature Local Static Provider `label:feat`
+- [v0.5] feat(flags): add CapabilityService `label:feat`
+- [v0.5] feat(prompt): add prompt templates `label:feat`
+- [v0.5] feat(prompt): add static prompt analysis `label:feat`
+- [v0.5] feat(directory): add AI directory recommendation `label:feat`
+- [v0.5] feat(stability): add exact URL hash memory `label:feat`
+- [v0.5] feat(stability): add host memory `label:feat`
+- [v0.5] feat(stability): add manual correction memory `label:feat`
+- [v0.5] feat(lock): add task lock with TTL `label:feat`
+- [v0.5] feat(diagnostics): add DiagnosticReport export `label:feat`
+- [v0.5] feat(performance): add performance modes `label:feat`
+- [v0.5] feat(ai): add OpenAI provider adapter `label:feat`
+- [v0.5] feat(ai): add OpenRouter provider adapter `label:feat`
+- [v0.5] feat(ai): add Anthropic provider adapter `label:feat`
+- [v0.5] feat(ai): add Gemini provider adapter `label:feat`
+- [v0.5] feat(ai): add Ollama provider adapter `label:feat`
+- [v0.5] feat(ai): add LM Studio provider adapter `label:feat`
+- [v0.5] test(provider): add provider contract tests `label:test`
+- [v0.5] test(privacy): add privacy regression tests `label:test`
+- [v0.5] docs: add bilingual README `label:docs`
+- [v0.5] docs: add architecture and diagnostics docs `label:docs`
+- [v1.0] chore(governance): add threat model `label:chore`
+- [v1.0] chore(governance): add RFC and ADR docs `label:chore`
+- [v1.0] chore(security): add permission and network boundary docs `label:chore`
+- [v1.0] chore(release): add SBOM script `label:chore`
+- [v1.0] chore(release): add checksum script `label:chore`
+- [v1.0] test(release): add Chrome local load checklist `label:test`
+- [v1.0] test(release): add Edge local load checklist `label:test`
+- [v1.0] test(release): add rollback scenario test `label:test`
+- [v1.0] test(release): add diagnostic export scenario test `label:test`
+- [v1.0] docs(recovery): add user recovery guide `label:docs`
+- [v1.0] docs(compat): add browser compatibility matrix `label:docs`
+- [v1.0] docs(compat): add provider compatibility matrix `label:docs`
+- [v1.0] docs(release): add release checklist `label:docs`
+- [v1.0] release: prepare v1.0 store package `label:release`

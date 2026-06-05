@@ -1,0 +1,61 @@
+title,milestone,label
+"chore: initialize WXT React TypeScript monorepo",v0.1,chore
+"feat(schema): add ID and time schema",v0.1,feat
+"feat(schema): add URL sanitizer and hash utilities",v0.1,feat
+"feat(schema): add bookmark schema",v0.1,feat
+"feat(schema): add OrganizeRunRecord schema",v0.1,feat
+"feat(schema): add OrganizePlan schema",v0.1,feat
+"feat(schema): add MoveLog schema",v0.1,feat
+"feat(schema): add Trace and DiagnosticReport schema",v0.1,feat
+"feat(browser): add BookmarkManagerPort",v0.1,feat
+"feat(browser): implement ChromiumBookmarkAdapter",v0.1,feat
+"feat(storage): add StorageRoot and schemaVersion",v0.1,feat
+"feat(secret): add SecretStorePort",v0.1,feat
+"feat(ai): add LlmProviderPort",v0.1,feat
+"feat(ai): implement DeepSeek provider",v0.1,feat
+"feat(ai): implement OpenAI-compatible provider",v0.1,feat
+"feat(directory): add default directory fallback",v0.1,feat
+"feat(bookmarks): read and flatten bookmark tree",v0.1,feat
+"feat(plan): build and validate OrganizePlan",v0.1,feat
+"feat(ui): add minimal settings page",v0.1,feat
+"feat(ui): add minimal organizer and preview page",v0.1,feat
+"feat(executor): apply selected plan items",v0.1,feat
+"feat(rollback): add MoveLog rollback",v0.1,feat
+"feat(trace): add basic TraceEvent recording",v0.1,feat
+"test(schema): add schema unit tests",v0.1,test
+"docs: add README and privacy draft",v0.1,docs
+"feat(flags): add OpenFeature Local Static Provider",v0.5,feat
+"feat(flags): add CapabilityService",v0.5,feat
+"feat(prompt): add prompt templates",v0.5,feat
+"feat(prompt): add static prompt analysis",v0.5,feat
+"feat(directory): add AI directory recommendation",v0.5,feat
+"feat(stability): add exact URL hash memory",v0.5,feat
+"feat(stability): add host memory",v0.5,feat
+"feat(stability): add manual correction memory",v0.5,feat
+"feat(lock): add task lock with TTL",v0.5,feat
+"feat(diagnostics): add DiagnosticReport export",v0.5,feat
+"feat(performance): add performance modes",v0.5,feat
+"feat(ai): add OpenAI provider adapter",v0.5,feat
+"feat(ai): add OpenRouter provider adapter",v0.5,feat
+"feat(ai): add Anthropic provider adapter",v0.5,feat
+"feat(ai): add Gemini provider adapter",v0.5,feat
+"feat(ai): add Ollama provider adapter",v0.5,feat
+"feat(ai): add LM Studio provider adapter",v0.5,feat
+"test(provider): add provider contract tests",v0.5,test
+"test(privacy): add privacy regression tests",v0.5,test
+"docs: add bilingual README",v0.5,docs
+"docs: add architecture and diagnostics docs",v0.5,docs
+"chore(governance): add threat model",v1.0,chore
+"chore(governance): add RFC and ADR docs",v1.0,chore
+"chore(security): add permission and network boundary docs",v1.0,chore
+"chore(release): add SBOM script",v1.0,chore
+"chore(release): add checksum script",v1.0,chore
+"test(release): add Chrome local load checklist",v1.0,test
+"test(release): add Edge local load checklist",v1.0,test
+"test(release): add rollback scenario test",v1.0,test
+"test(release): add diagnostic export scenario test",v1.0,test
+"docs(recovery): add user recovery guide",v1.0,docs
+"docs(compat): add browser compatibility matrix",v1.0,docs
+"docs(compat): add provider compatibility matrix",v1.0,docs
+"docs(release): add release checklist",v1.0,docs
+"release: prepare v1.0 store package",v1.0,release

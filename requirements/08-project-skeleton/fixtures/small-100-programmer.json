@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "1.0",
+  "id": "fixture_small_100_programmer",
+  "name": "Small programmer bookmarks sample",
+  "locale": "mixed",
+  "bookmarks": [
+    {
+      "id": "1",
+      "title": "GitHub",
+      "url": "https://github.com",
+      "currentPath": [
+        "Bookmarks Bar"
+      ]
+    },
+    {
+      "id": "2",
+      "title": "DeepSeek API Docs",
+      "url": "https://api-docs.deepseek.com/?token=secret#hash",
+      "currentPath": [
+        "AI"
+      ]
+    },
+    {
+      "id": "3",
+      "title": "Cloudflare DNS",
+      "url": "https://dash.cloudflare.com",
+      "currentPath": [
+        "Network"
+      ]
+    }
+  ],
+  "tags": [
+    "small",
+    "programmer",
+    "privacy"
+  ]
+}

@@ -1,0 +1,11 @@
+category,item,status
+Product,Final decisions captured,done
+Protocol,Data protocol summary included,done
+Governance,Engineering governance summary included,done
+Compatibility,Compatibility and release summary included,done
+GitHub,README drafts included,done
+GitHub,PRIVACY and SECURITY drafts included,done
+Codex,Codex rules included,done
+Codex,Codex execution plan included,done
+Issues,GitHub issues md/csv included,done
+Skeleton,Project skeleton seed included,done
