@@ -9,3 +9,10 @@ Codex,Codex rules included,done
 Codex,Codex execution plan included,done
 Issues,GitHub issues md/csv included,done
 Skeleton,Project skeleton seed included,done
+ExecutionContracts,AI classification I/O contract (envelope/prompt/output schema/batching/errors),done
+ExecutionContracts,Default directory taxonomy seed + limits,done
+ExecutionContracts,Apply/rollback/concurrency model + task lock,done
+ExecutionContracts,URL identity key + salt lifecycle + executable privacy oracle,done
+ExecutionContracts,Storage retention + MV3 resumable runtime,done
+ExecutionContracts,Per-issue DoD + measurable thresholds + convergence gate,done
+ExecutionContracts,schemaVersion unified to integer (D-01) in skeleton,done

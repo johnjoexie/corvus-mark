@@ -1,1 +1,12 @@
 /.idea/
+node_modules/
+.DS_Store
+
+# build / extension output
+.output/
+.wxt/
+dist/
+*.tsbuildinfo
+
+# logs
+*.log

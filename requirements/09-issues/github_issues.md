@@ -25,6 +25,16 @@
 - [v0.1] feat(trace): add basic TraceEvent recording `label:feat`
 - [v0.1] test(schema): add schema unit tests `label:test`
 - [v0.1] docs: add README and privacy draft `label:docs`
+- [v0.1] feat(plan): add expectedParentId snapshot + precondition checks on apply `label:feat`
+- [v0.1] feat(executor): write-ahead MoveLog, folders-first, append-only moves `label:feat`
+- [v0.1] feat(lock): add minimal task lock with TTL (pulled forward from v0.5) `label:feat`
+- [v0.1] feat(privacy): add outbound allowlist guard + computed DiagnosticPrivacyStatement `label:feat`
+- [v0.1] feat(storage): add retention/pruning with live-MoveLog protection `label:feat`
+- [v0.1] feat(runtime): make classification batches resumable across MV3 worker restarts `label:feat`
+- [v0.1] feat(directory): add seed taxonomy RulePack + offline host rules `label:feat`
+- [v0.1] test(privacy): add adversarial privacy regression oracle `label:test`
+- [v0.1] test(rollback): add crash-injection + concurrency-lock tests `label:test`
+- [v0.1] test(fixtures): add dup-urls, adversarial, deep-nested, non-ascii, large-5000 `label:test`
 - [v0.5] feat(flags): add OpenFeature Local Static Provider `label:feat`
 - [v0.5] feat(flags): add CapabilityService `label:feat`
 - [v0.5] feat(prompt): add prompt templates `label:feat`
