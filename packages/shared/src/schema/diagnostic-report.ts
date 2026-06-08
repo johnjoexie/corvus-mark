@@ -24,10 +24,56 @@ export const diagnosticReportSchema = z.object({
   privacy: diagnosticPrivacyStatementSchema,
 })
 
+export const diagnosticReportExportSchema = diagnosticReportSchema.refine(
+  (report) => isDiagnosticExportable(report.privacy),
+  {
+    message: 'diagnostic report is not exportable',
+    path: ['privacy'],
+  },
+)
+
 export type DiagnosticPrivacyStatement = z.infer<typeof diagnosticPrivacyStatementSchema>
 export type DiagnosticReport = z.infer<typeof diagnosticReportSchema>
 
 /** True only when the report carries no forbidden data (every flag false). */
 export function isDiagnosticExportable(privacy: DiagnosticPrivacyStatement): boolean {
   return Object.values(privacy).every((v) => v === false)
+}
+
+function collectStrings(value: unknown, out: string[]): void {
+  if (typeof value === 'string') out.push(value)
+  else if (Array.isArray(value)) value.forEach((item) => collectStrings(item, out))
+  else if (value && typeof value === 'object') {
+    Object.values(value).forEach((item) => collectStrings(item, out))
+  }
+}
+
+function computePrivacyStatement(report: Omit<DiagnosticReport, 'privacy'>): DiagnosticPrivacyStatement {
+  const serialized = JSON.stringify(report)
+  const strings: string[] = []
+  collectStrings(report, strings)
+
+  return {
+    includesApiKey: /sk-[A-Za-z0-9]{16,}|api[_-]?key/i.test(serialized),
+    includesAuthorizationHeader: /authorization|bearer\s+/i.test(serialized),
+    includesRawUrl: /rawUrl/i.test(serialized),
+    includesQuery: strings.some((value) => /https?:\/\/[^"'\s?]+[?][^"'\s]+/.test(value)),
+    includesHash: strings.some((value) => /https?:\/\/[^"'\s#]+#[^"'\s]+/.test(value)),
+    includesCookie: /cookie/i.test(serialized),
+    includesPageContent: /pageContent/i.test(serialized),
+    includesFullBookmarkTree: /fullBookmarkTree/i.test(serialized),
+    includesBrowsingHistory: /browsingHistory/i.test(serialized),
+  }
+}
+
+export function toExportableDiagnosticReport(value: unknown): DiagnosticReport {
+  const parsed = diagnosticReportSchema.parse(value)
+  const { privacy: _ignored, ...withoutPrivacy } = parsed
+  const privacy = computePrivacyStatement(withoutPrivacy)
+  const report = { ...withoutPrivacy, privacy }
+
+  if (!isDiagnosticExportable(privacy)) {
+    throw new Error('diagnostic report is not exportable')
+  }
+  return diagnosticReportExportSchema.parse(report)
 }
