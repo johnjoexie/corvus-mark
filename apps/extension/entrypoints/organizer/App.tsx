@@ -2,11 +2,17 @@ import { useState } from 'react'
 import type { MoveLog, OrganizePlan } from '@corvus-mark/shared'
 import { browser } from 'wxt/browser'
 import type { BackgroundRequest, BackgroundResponse } from '../../lib/messages'
+import {
+  buildApplyConfirmation,
+  canApplyWithConfirmation,
+  type ApplyConfirmation,
+} from './apply-confirmation'
 
 export function App() {
   const [plan, setPlan] = useState<OrganizePlan | undefined>()
   const [moveLog, setMoveLog] = useState<MoveLog | undefined>()
   const [status, setStatus] = useState('Ready')
+  const [confirmation, setConfirmation] = useState<ApplyConfirmation | undefined>()
 
   async function send(request: BackgroundRequest): Promise<BackgroundResponse> {
     return browser.runtime.sendMessage<BackgroundRequest, BackgroundResponse>(request)
@@ -17,6 +23,7 @@ export function App() {
     const response = await send({ type: 'preview-plan' })
     if (response.ok && 'plan' in response) {
       setPlan(response.plan)
+      setConfirmation(undefined)
       setStatus(response.degraded ? 'Preview built with offline fallback' : 'Preview built with AI')
     } else {
       setStatus(response.ok ? 'Preview built' : response.error)
@@ -25,8 +32,15 @@ export function App() {
 
   async function apply() {
     if (!plan) return
+    if (!canApplyWithConfirmation(plan, confirmation)) {
+      const next = buildApplyConfirmation(plan)
+      setConfirmation(next)
+      setStatus(`Confirm apply: ${next.applyCount} selected moves from ${next.itemCount} preview items`)
+      return
+    }
     setStatus('Applying selected moves...')
     const response = await send({ type: 'apply-plan', plan })
+    setConfirmation(undefined)
     if (response.ok && 'moveLog' in response) {
       setMoveLog(response.moveLog)
       setStatus(`Apply result: ${response.moveLog.status}`)
@@ -54,7 +68,7 @@ export function App() {
           Generate preview
         </button>
         <button type="button" disabled={!plan} onClick={() => void apply()}>
-          Apply selected
+          {plan && confirmation ? 'Confirm apply' : 'Apply selected'}
         </button>
         <button type="button" onClick={() => void rollback()}>
           Rollback
