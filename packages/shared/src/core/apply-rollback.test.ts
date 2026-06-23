@@ -5,6 +5,7 @@ import type { OrganizePlan } from '../schema/organize-plan'
 
 class MemoryBookmarkManager implements BookmarkManagerPort {
   nodes = new Map<string, BrowserBookmarkTreeNode>()
+  operations: string[] = []
 
   constructor(nodes: BrowserBookmarkTreeNode[]) {
     nodes.forEach((node) => this.nodes.set(node.id, { ...node }))
@@ -15,6 +16,7 @@ class MemoryBookmarkManager implements BookmarkManagerPort {
   }
 
   async createFolder(parentId: string, title: string): Promise<BrowserBookmarkTreeNode> {
+    this.operations.push(`create:${title}`)
     const id = `folder_${this.nodes.size + 1}`
     const node = { id, parentId, title }
     this.nodes.set(id, node)
@@ -22,6 +24,7 @@ class MemoryBookmarkManager implements BookmarkManagerPort {
   }
 
   async moveBookmark(id: string, target: { parentId: string }): Promise<BrowserBookmarkTreeNode> {
+    this.operations.push(`move:${id}`)
     const node = this.nodes.get(id)
     if (!node) throw new Error('missing bookmark')
     const moved = { ...node, parentId: target.parentId }
@@ -113,6 +116,42 @@ describe('applySelectedPlanItems', () => {
 
     expect(moveLog.items[0]?.status).toBe('skipped_stale_moved')
     expect(bookmarks.nodes.get('b1')?.parentId).toBe('somewhere_else')
+  })
+
+  it('resolves all target folders before moving any bookmark', async () => {
+    const bookmarks = new MemoryBookmarkManager([
+      { id: 'b1', parentId: 'old', title: 'React', url: 'https://react.dev' },
+      { id: 'b2', parentId: 'old', title: 'TypeScript', url: 'https://typescriptlang.org' },
+    ])
+    const twoItemPlan: OrganizePlan = {
+      ...plan,
+      stats: { ...plan.stats, totalItems: 2, moveItems: 2 },
+      items: [
+        plan.items[0]!,
+        {
+          ...plan.items[0]!,
+          bookmarkId: 'b2',
+          title: 'TypeScript',
+          sanitizedUrl: 'https://typescriptlang.org',
+          urlKeyHash: 'hash_2',
+          hostKey: 'typescriptlang.org',
+        },
+      ],
+    }
+
+    await applySelectedPlanItems({
+      plan: twoItemPlan,
+      bookmarkManager: bookmarks,
+      moveLogStore: new MemoryMoveLogStore(),
+      resolveTargetParentId: async (item) => {
+        bookmarks.operations.push(`resolve:${item.bookmarkId}`)
+        return `new_${item.bookmarkId}`
+      },
+      createdAt: '2026-06-05T00:01:00.000Z',
+      moveLogId: 'move_1',
+    })
+
+    expect(bookmarks.operations).toEqual(['resolve:b1', 'resolve:b2', 'move:b1', 'move:b2'])
   })
 })
 

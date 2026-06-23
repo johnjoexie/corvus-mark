@@ -7,6 +7,7 @@ import {
   flattenBookmarkTree,
   nowIso,
   recordTraceEvent,
+  resolveTargetParentId as resolveTargetFolderParentId,
   rollbackMoveLog,
   sanitizeUrl,
   type MoveLog,
@@ -198,10 +199,6 @@ async function buildPreviewPlan(): Promise<{ plan: OrganizePlan; degraded: boole
   return { plan, degraded }
 }
 
-async function resolveTargetParentId(_item: OrganizePlan['items'][number]): Promise<string> {
-  return '1'
-}
-
 async function handleMessage(request: BackgroundRequest): Promise<BackgroundResponse> {
   try {
     if (request.type === 'get-settings') {
@@ -225,7 +222,7 @@ async function handleMessage(request: BackgroundRequest): Promise<BackgroundResp
             await browser.storage.local.set({ [LAST_MOVE_LOG_KEY]: value })
           },
         },
-        resolveTargetParentId,
+        resolveTargetParentId: (item) => resolveTargetFolderParentId(bookmarkManager, item.targetPath),
         createdAt: nowIso(),
         moveLogId: createCorvusId('move'),
       })

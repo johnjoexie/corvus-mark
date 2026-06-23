@@ -44,9 +44,15 @@ export async function applySelectedPlanItems(input: ApplySelectedPlanItemsInput)
   })
   await input.moveLogStore.saveMoveLog(moveLog)
 
+  const targetParentIds = new Map<string, string>()
+  for (const item of selectedItems) {
+    targetParentIds.set(item.bookmarkId, await input.resolveTargetParentId(item))
+  }
+
   for (const item of selectedItems) {
     const current = await findBookmark(input.bookmarkManager, item.bookmarkId)
-    const newParentId = await input.resolveTargetParentId(item)
+    const newParentId = targetParentIds.get(item.bookmarkId)
+    if (!newParentId) throw new Error(`target parent not resolved: ${item.bookmarkId}`)
     const logItem: MoveLogItem = {
       schemaVersion: 1,
       bookmarkId: item.bookmarkId,
