@@ -1,5 +1,6 @@
 import {
   OpenAiCompatibleProvider,
+  acquireTaskLock,
   buildDefaultRulePack,
   buildOrganizePlan,
   classifyByDefaultDirectory,
@@ -7,9 +8,11 @@ import {
   flattenBookmarkTree,
   nowIso,
   recordTraceEvent,
+  releaseTaskLock,
   resolveTargetParentId as resolveTargetFolderParentId,
   rollbackMoveLog,
   sanitizeUrl,
+  type TaskLock,
   type MoveLog,
   type NormalizedBookmark,
   type OrganizePlan,
@@ -25,7 +28,9 @@ const SETTINGS_KEY = 'settings:provider'
 const LAST_PLAN_KEY = 'runtime:lastPlan'
 const LAST_MOVE_LOG_KEY = 'runtime:lastMoveLog'
 const TRACE_EVENTS_KEY = 'runtime:traceEvents'
+const TASK_LOCK_KEY = 'taskLock'
 const URL_SALT_KEY = 'policy:urlSalt'
+const TASK_LOCK_TTL_MS = 120000
 
 const defaultSettings: Omit<ProviderSettings, 'apiKeyMasked'> = {
   provider: 'deepseek',
@@ -35,6 +40,20 @@ const defaultSettings: Omit<ProviderSettings, 'apiKeyMasked'> = {
 
 const secretStore = new StorageSecretStoreAdapter(browser.storage.local)
 const bookmarkManager = new ChromiumBookmarkAdapter(browser)
+const taskLockStore = {
+  getTaskLock: async () => {
+    const stored = await browser.storage.local.get(TASK_LOCK_KEY)
+    return stored[TASK_LOCK_KEY] as TaskLock | undefined
+  },
+  setTaskLock: async (value: TaskLock) => {
+    await browser.storage.local.set({ [TASK_LOCK_KEY]: value })
+  },
+  clearTaskLock: async (lockId: string) => {
+    const stored = await browser.storage.local.get(TASK_LOCK_KEY)
+    const current = stored[TASK_LOCK_KEY] as TaskLock | undefined
+    if (current?.lockId === lockId) await browser.storage.local.remove(TASK_LOCK_KEY)
+  },
+}
 
 async function getUrlSalt(): Promise<string> {
   const stored = await browser.storage.local.get(URL_SALT_KEY)
@@ -110,6 +129,25 @@ async function recordRuntimeTrace(input: {
     createdAt: nowIso(),
     metadata: input.metadata,
   })
+}
+
+async function withBookmarkTaskLock<T>(kind: TaskLock['kind'], run: () => Promise<T>): Promise<T> {
+  const lock = await acquireTaskLock({
+    store: taskLockStore,
+    lockId: createCorvusId('run'),
+    kind,
+    acquiredAt: nowIso(),
+    ttlMs: TASK_LOCK_TTL_MS,
+  })
+
+  try {
+    return await run()
+  } finally {
+    await releaseTaskLock({
+      store: taskLockStore,
+      lockId: lock.lockId,
+    })
+  }
 }
 
 async function buildPreviewPlan(): Promise<{ plan: OrganizePlan; degraded: boolean }> {
@@ -214,62 +252,66 @@ async function handleMessage(request: BackgroundRequest): Promise<BackgroundResp
       return { ok: true, ...result }
     }
     if (request.type === 'apply-plan') {
-      const moveLog = await applySelectedPlanItems({
-        plan: request.plan,
-        bookmarkManager,
-        moveLogStore: {
-          saveMoveLog: async (value: MoveLog) => {
-            await browser.storage.local.set({ [LAST_MOVE_LOG_KEY]: value })
+      return await withBookmarkTaskLock('apply', async () => {
+        const moveLog = await applySelectedPlanItems({
+          plan: request.plan,
+          bookmarkManager,
+          moveLogStore: {
+            saveMoveLog: async (value: MoveLog) => {
+              await browser.storage.local.set({ [LAST_MOVE_LOG_KEY]: value })
+            },
           },
-        },
-        resolveTargetParentId: (item) => resolveTargetFolderParentId(bookmarkManager, item.targetPath),
-        createdAt: nowIso(),
-        moveLogId: createCorvusId('move'),
+          resolveTargetParentId: (item) => resolveTargetFolderParentId(bookmarkManager, item.targetPath),
+          createdAt: nowIso(),
+          moveLogId: createCorvusId('move'),
+        })
+        await browser.storage.local.set({ [LAST_MOVE_LOG_KEY]: moveLog })
+        await recordRuntimeTrace({
+          traceId: request.plan.traceId,
+          runId: request.plan.runId,
+          phase: 'apply',
+          level: moveLog.status === 'partial_failed' ? 'warning' : 'info',
+          message: `apply ${moveLog.status}`,
+          metadata: {
+            status: moveLog.status,
+            itemCount: moveLog.items.length,
+            successItems: moveLog.items.filter((item) => item.status === 'success').length,
+            skippedItems: moveLog.items.filter((item) => item.status.startsWith('skipped_')).length,
+            failedItems: moveLog.items.filter((item) => item.status === 'failed').length,
+          },
+        })
+        return { ok: true, moveLog }
       })
-      await browser.storage.local.set({ [LAST_MOVE_LOG_KEY]: moveLog })
-      await recordRuntimeTrace({
-        traceId: request.plan.traceId,
-        runId: request.plan.runId,
-        phase: 'apply',
-        level: moveLog.status === 'partial_failed' ? 'warning' : 'info',
-        message: `apply ${moveLog.status}`,
-        metadata: {
-          status: moveLog.status,
-          itemCount: moveLog.items.length,
-          successItems: moveLog.items.filter((item) => item.status === 'success').length,
-          skippedItems: moveLog.items.filter((item) => item.status.startsWith('skipped_')).length,
-          failedItems: moveLog.items.filter((item) => item.status === 'failed').length,
-        },
-      })
-      return { ok: true, moveLog }
     }
     if (request.type === 'rollback-last') {
-      const stored = await browser.storage.local.get(LAST_MOVE_LOG_KEY)
-      const moveLog = stored[LAST_MOVE_LOG_KEY] as MoveLog | undefined
-      if (!moveLog) return { ok: false, error: 'No MoveLog available' }
-      const rolledBack = await rollbackMoveLog({
-        moveLog,
-        bookmarkManager,
-        moveLogStore: {
-          saveMoveLog: async (value: MoveLog) => {
-            await browser.storage.local.set({ [LAST_MOVE_LOG_KEY]: value })
+      return await withBookmarkTaskLock('rollback', async () => {
+        const stored = await browser.storage.local.get(LAST_MOVE_LOG_KEY)
+        const moveLog = stored[LAST_MOVE_LOG_KEY] as MoveLog | undefined
+        if (!moveLog) return { ok: false, error: 'No MoveLog available' }
+        const rolledBack = await rollbackMoveLog({
+          moveLog,
+          bookmarkManager,
+          moveLogStore: {
+            saveMoveLog: async (value: MoveLog) => {
+              await browser.storage.local.set({ [LAST_MOVE_LOG_KEY]: value })
+            },
           },
-        },
+        })
+        await recordRuntimeTrace({
+          traceId: rolledBack.traceId,
+          runId: rolledBack.runId,
+          phase: 'rollback',
+          level: 'info',
+          message: `rollback ${rolledBack.status}`,
+          metadata: {
+            status: rolledBack.status,
+            itemCount: rolledBack.items.length,
+            rolledBackItems: rolledBack.items.filter((item) => item.status === 'rolled_back').length,
+            skippedItems: rolledBack.items.filter((item) => item.status === 'rollback_skipped').length,
+          },
+        })
+        return { ok: true, moveLog: rolledBack }
       })
-      await recordRuntimeTrace({
-        traceId: rolledBack.traceId,
-        runId: rolledBack.runId,
-        phase: 'rollback',
-        level: 'info',
-        message: `rollback ${rolledBack.status}`,
-        metadata: {
-          status: rolledBack.status,
-          itemCount: rolledBack.items.length,
-          rolledBackItems: rolledBack.items.filter((item) => item.status === 'rolled_back').length,
-          skippedItems: rolledBack.items.filter((item) => item.status === 'rollback_skipped').length,
-        },
-      })
-      return { ok: true, moveLog: rolledBack }
     }
     return { ok: false, error: 'Unknown request' }
   } catch (error) {
