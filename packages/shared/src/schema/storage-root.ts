@@ -51,10 +51,36 @@ export function measureStorageRootBytes(value: unknown): number {
   return new TextEncoder().encode(JSON.stringify(value)).byteLength
 }
 
+function pruneTraces(root: StorageRoot): StorageRoot['traces'] {
+  const byRun = new Map<string, StorageRoot['traces']>()
+  for (const trace of root.traces) {
+    byRun.set(trace.runId, [...(byRun.get(trace.runId) ?? []), trace])
+  }
+
+  const latestRunIds = [...byRun.entries()]
+    .map(([runId, traces]) => ({
+      runId,
+      latestAt: traces.reduce(
+        (latest, trace) => (trace.createdAt > latest ? trace.createdAt : latest),
+        '',
+      ),
+    }))
+    .sort((a, b) => a.latestAt.localeCompare(b.latestAt))
+    .slice(-5)
+    .map((entry) => entry.runId)
+
+  return latestRunIds.flatMap((runId) =>
+    (byRun.get(runId) ?? [])
+      .slice()
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+      .slice(-100),
+  )
+}
+
 export function pruneStorageRoot(root: StorageRoot): StorageRoot {
   const runs = root.runs.slice(-20)
   const transactions = root.transactions.slice(-10)
-  const traces = root.traces.slice(-500)
+  const traces = pruneTraces(root)
   const classificationMemory = {
     ...root.classificationMemory,
     entries: root.classificationMemory.entries

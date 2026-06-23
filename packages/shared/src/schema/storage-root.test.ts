@@ -49,4 +49,30 @@ describe('storageRootSchema', () => {
     expect(pruned.moveLogs.some((log) => log.id === 'move_0')).toBe(true)
     expect(pruned.moveLogs.length).toBeLessThanOrEqual(11)
   })
+
+  it('keeps traces for the latest five runs only', () => {
+    const root = storageRootSchema.parse({
+      ...baseRoot,
+      traces: Array.from({ length: 6 }, (_, i) => ({
+        schemaVersion: 1,
+        eventId: `evt_${i}`,
+        traceId: `trace_${i}`,
+        runId: `run_${i}`,
+        phase: 'classify',
+        level: 'info',
+        message: 'batch completed',
+        createdAt: `2026-06-05T00:0${i}:00.000Z`,
+      })),
+    })
+
+    const pruned = pruneStorageRoot(root)
+
+    expect([...new Set(pruned.traces.map((trace) => trace.runId))]).toEqual([
+      'run_1',
+      'run_2',
+      'run_3',
+      'run_4',
+      'run_5',
+    ])
+  })
 })
