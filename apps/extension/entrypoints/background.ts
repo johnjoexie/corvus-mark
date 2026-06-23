@@ -6,11 +6,13 @@ import {
   createCorvusId,
   flattenBookmarkTree,
   nowIso,
+  recordTraceEvent,
   rollbackMoveLog,
   sanitizeUrl,
   type MoveLog,
   type NormalizedBookmark,
   type OrganizePlan,
+  type TraceEvent,
 } from '@corvus-mark/shared'
 import { browser } from 'wxt/browser'
 import { applySelectedPlanItems } from '@corvus-mark/shared'
@@ -21,6 +23,7 @@ import type { BackgroundRequest, BackgroundResponse, ProviderSettings } from '..
 const SETTINGS_KEY = 'settings:provider'
 const LAST_PLAN_KEY = 'runtime:lastPlan'
 const LAST_MOVE_LOG_KEY = 'runtime:lastMoveLog'
+const TRACE_EVENTS_KEY = 'runtime:traceEvents'
 const URL_SALT_KEY = 'policy:urlSalt'
 
 const defaultSettings: Omit<ProviderSettings, 'apiKeyMasked'> = {
@@ -81,10 +84,39 @@ async function normalizeBookmarks(): Promise<NormalizedBookmark[]> {
   return normalized.filter((bookmark) => bookmark.isValidUrl)
 }
 
+async function appendTraceEvent(event: TraceEvent): Promise<void> {
+  const stored = await browser.storage.local.get(TRACE_EVENTS_KEY)
+  const current = Array.isArray(stored[TRACE_EVENTS_KEY]) ? stored[TRACE_EVENTS_KEY] : []
+  await browser.storage.local.set({ [TRACE_EVENTS_KEY]: [...current, event].slice(-500) })
+}
+
+async function recordRuntimeTrace(input: {
+  traceId: string
+  runId: string
+  phase: TraceEvent['phase']
+  level: TraceEvent['level']
+  message: string
+  metadata?: Record<string, unknown>
+}): Promise<void> {
+  await recordTraceEvent({
+    store: { appendTraceEvent },
+    eventId: createCorvusId('evt'),
+    traceId: input.traceId,
+    runId: input.runId,
+    phase: input.phase,
+    level: input.level,
+    message: input.message,
+    createdAt: nowIso(),
+    metadata: input.metadata,
+  })
+}
+
 async function buildPreviewPlan(): Promise<{ plan: OrganizePlan; degraded: boolean }> {
   const settings = await getProviderSettings()
   const bookmarks = await normalizeBookmarks()
   const rulePack = buildDefaultRulePack()
+  const runId = createCorvusId('run')
+  const traceId = createCorvusId('trace')
   const refs = new Map<string, string>()
   bookmarks.forEach((bookmark, index) => refs.set(`b${index}`, bookmark.id))
 
@@ -105,8 +137,8 @@ async function buildPreviewPlan(): Promise<{ plan: OrganizePlan; degraded: boole
     const envelope = {
       schemaVersion: 1 as const,
       envelopeId: createCorvusId('evt'),
-      runId: createCorvusId('run'),
-      traceId: createCorvusId('trace'),
+      runId,
+      traceId,
       createdAt: nowIso(),
       task: 'classify_bookmarks' as const,
       locale: 'en',
@@ -137,8 +169,8 @@ async function buildPreviewPlan(): Promise<{ plan: OrganizePlan; degraded: boole
   }
 
   const plan = buildOrganizePlan({
-    runId: createCorvusId('run'),
-    traceId: createCorvusId('trace'),
+    runId,
+    traceId,
     planId: createCorvusId('plan'),
     createdAt: nowIso(),
     bookmarks,
@@ -150,6 +182,19 @@ async function buildPreviewPlan(): Promise<{ plan: OrganizePlan; degraded: boole
     maxNewFolders: rulePack.maxNewFolders,
   })
   await browser.storage.local.set({ [LAST_PLAN_KEY]: plan })
+  await recordRuntimeTrace({
+    traceId,
+    runId,
+    phase: 'preview',
+    level: 'info',
+    message: degraded ? 'preview built with offline fallback' : 'preview built with provider',
+    metadata: {
+      itemCount: plan.items.length,
+      moveItems: plan.stats.moveItems,
+      blockedItems: plan.stats.blockedItems,
+      degraded,
+    },
+  })
   return { plan, degraded }
 }
 
@@ -185,6 +230,20 @@ async function handleMessage(request: BackgroundRequest): Promise<BackgroundResp
         moveLogId: createCorvusId('move'),
       })
       await browser.storage.local.set({ [LAST_MOVE_LOG_KEY]: moveLog })
+      await recordRuntimeTrace({
+        traceId: request.plan.traceId,
+        runId: request.plan.runId,
+        phase: 'apply',
+        level: moveLog.status === 'partial_failed' ? 'warning' : 'info',
+        message: `apply ${moveLog.status}`,
+        metadata: {
+          status: moveLog.status,
+          itemCount: moveLog.items.length,
+          successItems: moveLog.items.filter((item) => item.status === 'success').length,
+          skippedItems: moveLog.items.filter((item) => item.status.startsWith('skipped_')).length,
+          failedItems: moveLog.items.filter((item) => item.status === 'failed').length,
+        },
+      })
       return { ok: true, moveLog }
     }
     if (request.type === 'rollback-last') {
@@ -198,6 +257,19 @@ async function handleMessage(request: BackgroundRequest): Promise<BackgroundResp
           saveMoveLog: async (value: MoveLog) => {
             await browser.storage.local.set({ [LAST_MOVE_LOG_KEY]: value })
           },
+        },
+      })
+      await recordRuntimeTrace({
+        traceId: rolledBack.traceId,
+        runId: rolledBack.runId,
+        phase: 'rollback',
+        level: 'info',
+        message: `rollback ${rolledBack.status}`,
+        metadata: {
+          status: rolledBack.status,
+          itemCount: rolledBack.items.length,
+          rolledBackItems: rolledBack.items.filter((item) => item.status === 'rolled_back').length,
+          skippedItems: rolledBack.items.filter((item) => item.status === 'rollback_skipped').length,
         },
       })
       return { ok: true, moveLog: rolledBack }
