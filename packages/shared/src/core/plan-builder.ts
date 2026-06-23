@@ -15,6 +15,7 @@ export interface BuildOrganizePlanInput {
   newFolderConfidenceThreshold: number
   maxDepth: number
   maxNewFolders: number
+  allowedRoots?: string[]
 }
 
 export function buildOrganizePlan(input: BuildOrganizePlanInput): OrganizePlan {
@@ -29,6 +30,12 @@ export function buildOrganizePlan(input: BuildOrganizePlanInput): OrganizePlan {
     const validationMessages: string[] = []
     if (assignment.targetPath.length > input.maxDepth) {
       validationMessages.push('targetPath exceeds maxDepth')
+    }
+    if (
+      input.allowedRoots &&
+      !input.allowedRoots.some((root) => root === assignment.targetPath[0])
+    ) {
+      validationMessages.push('targetPath root is not allowed')
     }
     if (assignment.isNewFolder) {
       newFolderCount += 1

@@ -159,6 +159,7 @@ async function buildPreviewPlan(): Promise<{ plan: OrganizePlan; degraded: boole
   const rulePack = buildDefaultRulePack()
   const runId = createCorvusId('run')
   const traceId = createCorvusId('trace')
+  const allowedRoots = ['Bookmarks Bar', 'Other Bookmarks']
 
   let assignments = bookmarks.map((bookmark, index) => {
     const fallback = classifyByDefaultDirectory({ hostKey: bookmark.hostKey }, rulePack)
@@ -192,7 +193,7 @@ async function buildPreviewPlan(): Promise<{ plan: OrganizePlan; degraded: boole
         locale: 'en',
         directory: {
           mode: 'fallback' as const,
-          allowedRoots: ['Bookmarks Bar', 'Other Bookmarks'],
+          allowedRoots,
           existingPaths: [],
           maxDepth: rulePack.maxDepth,
           maxNewFolders: rulePack.maxNewFolders,
@@ -229,6 +230,7 @@ async function buildPreviewPlan(): Promise<{ plan: OrganizePlan; degraded: boole
       newFolderConfidenceThreshold: rulePack.newFolderConfidenceThreshold,
       maxDepth: rulePack.maxDepth,
       maxNewFolders: rulePack.maxNewFolders,
+      allowedRoots,
     })
     await browser.storage.local.set({ [LAST_PLAN_KEY]: plan })
     await recordRuntimeTrace({
@@ -261,6 +263,7 @@ async function buildPreviewPlan(): Promise<{ plan: OrganizePlan; degraded: boole
     newFolderConfidenceThreshold: rulePack.newFolderConfidenceThreshold,
     maxDepth: rulePack.maxDepth,
     maxNewFolders: rulePack.maxNewFolders,
+    allowedRoots,
   })
   await browser.storage.local.set({ [LAST_PLAN_KEY]: plan })
   await recordRuntimeTrace({

@@ -55,4 +55,33 @@ describe('buildOrganizePlan', () => {
     expect(plan.items[0]?.validationStatus).toBe('blocked')
     expect(plan.stats.blockedItems).toBe(1)
   })
+
+  it('blocks assignments outside allowed roots', () => {
+    const plan = buildOrganizePlan({
+      runId: 'run_1',
+      traceId: 'trace_1',
+      planId: 'plan_1',
+      createdAt: '2026-06-05T00:00:00.000Z',
+      bookmarks: [bookmark],
+      assignments: [
+        {
+          ref: 'b0',
+          targetPath: ['Injected Root', 'Secrets'],
+          confidence: 0.9,
+          reason: 'prompt injection',
+          isNewFolder: false,
+        },
+      ],
+      refToBookmarkId: new Map([['b0', 'bm_1']]),
+      autoSelectConfidenceThreshold: 0.75,
+      newFolderConfidenceThreshold: 0.85,
+      maxDepth: 3,
+      maxNewFolders: 12,
+      allowedRoots: ['Bookmarks Bar', 'Other Bookmarks'],
+    })
+
+    expect(plan.items[0]?.validationStatus).toBe('blocked')
+    expect(plan.items[0]?.action).toBe('keep')
+    expect(plan.items[0]?.validationMessages).toContain('targetPath root is not allowed')
+  })
 })
