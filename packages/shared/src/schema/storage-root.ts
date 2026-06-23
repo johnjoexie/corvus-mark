@@ -47,6 +47,8 @@ export const storageRootSchema = z.object({
 export type ClassificationMemoryEntry = z.infer<typeof classificationMemoryEntrySchema>
 export type StorageRoot = z.infer<typeof storageRootSchema>
 
+export const STORAGE_ROOT_BUDGET_BYTES = 3 * 1024 * 1024
+
 export function measureStorageRootBytes(value: unknown): number {
   return new TextEncoder().encode(JSON.stringify(value)).byteLength
 }
@@ -77,7 +79,40 @@ function pruneTraces(root: StorageRoot): StorageRoot['traces'] {
   )
 }
 
-export function pruneStorageRoot(root: StorageRoot): StorageRoot {
+function trimToBudget(root: StorageRoot, maxBytes: number): StorageRoot {
+  let next = root
+
+  while (
+    measureStorageRootBytes(next) >= maxBytes &&
+    next.classificationMemory.entries.length > 0
+  ) {
+    next = {
+      ...next,
+      classificationMemory: {
+        ...next.classificationMemory,
+        entries: next.classificationMemory.entries.slice(
+          Math.max(1, Math.floor(next.classificationMemory.entries.length / 2)),
+        ),
+      },
+    }
+  }
+
+  if (measureStorageRootBytes(next) < maxBytes) return next
+
+  next = { ...next, traces: [] }
+  if (measureStorageRootBytes(next) < maxBytes) return next
+
+  next = { ...next, runs: [], transactions: [] }
+  if (measureStorageRootBytes(next) < maxBytes) return next
+
+  const liveMoveLogs = next.moveLogs.filter((log) => log.status !== 'rolled_back')
+  return { ...next, moveLogs: liveMoveLogs }
+}
+
+export function pruneStorageRoot(
+  root: StorageRoot,
+  maxBytes = STORAGE_ROOT_BUDGET_BYTES,
+): StorageRoot {
   const runs = root.runs.slice(-20)
   const transactions = root.transactions.slice(-10)
   const traces = pruneTraces(root)
@@ -92,7 +127,8 @@ export function pruneStorageRoot(root: StorageRoot): StorageRoot {
   const liveMoveLogs = root.moveLogs.filter((log) => log.status !== 'rolled_back')
   const rolledBackMoveLogs = root.moveLogs.filter((log) => log.status === 'rolled_back').slice(-10)
 
-  return {
+  return trimToBudget(
+    {
     ...root,
     runs,
     transactions,
@@ -101,5 +137,7 @@ export function pruneStorageRoot(root: StorageRoot): StorageRoot {
     moveLogs: [...liveMoveLogs, ...rolledBackMoveLogs].sort((a, b) =>
       a.createdAt.localeCompare(b.createdAt),
     ),
-  }
+    },
+    maxBytes,
+  )
 }

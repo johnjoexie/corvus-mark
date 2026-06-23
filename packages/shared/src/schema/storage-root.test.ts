@@ -75,4 +75,44 @@ describe('storageRootSchema', () => {
       'run_5',
     ])
   })
+
+  it('keeps pruned storage below the 3 MB budget while preserving live move logs', () => {
+    const liveMoveLog = {
+      schemaVersion: 1,
+      id: 'move_live',
+      planId: 'plan_1',
+      runId: 'run_1',
+      traceId: 'trace_1',
+      createdAt: '2026-06-05T00:00:00.000Z',
+      status: 'completed' as const,
+      items: [],
+    }
+    const root = storageRootSchema.parse({
+      ...baseRoot,
+      classificationMemory: {
+        schemaVersion: 1,
+        entries: Array.from({ length: 55_000 }, (_, i) => ({
+          schemaVersion: 1,
+          urlKeyHash: `hash_${i}_${'x'.repeat(96)}`,
+          targetPath: ['Reference'],
+          confirmedAt: '2026-01-01T00:00:00.000Z',
+          lastUsedAt: `2026-01-01T00:${String(i % 60).padStart(2, '0')}:00.000Z`,
+        })),
+      },
+      moveLogs: [
+        liveMoveLog,
+        ...Array.from({ length: 30 }, (_, i) => ({
+          ...liveMoveLog,
+          id: `move_rolled_${i}`,
+          createdAt: `2026-06-05T00:${String(i + 1).padStart(2, '0')}:00.000Z`,
+          status: 'rolled_back' as const,
+        })),
+      ],
+    })
+
+    const pruned = pruneStorageRoot(root)
+
+    expect(measureStorageRootBytes(pruned)).toBeLessThan(3 * 1024 * 1024)
+    expect(pruned.moveLogs.some((log) => log.id === 'move_live')).toBe(true)
+  })
 })
