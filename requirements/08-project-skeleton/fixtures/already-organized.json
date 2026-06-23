@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "1.0",
+  "id": "fixture_already_organized",
+  "name": "Already organized no-op sample",
+  "locale": "en",
+  "bookmarks": [
+    {
+      "id": "organized-1",
+      "title": "GitHub",
+      "url": "https://github.com",
+      "currentPath": ["Dev"]
+    },
+    {
+      "id": "organized-2",
+      "title": "React Docs",
+      "url": "https://react.dev",
+      "currentPath": ["Dev", "Frontend"]
+    },
+    {
+      "id": "organized-3",
+      "title": "Arxiv",
+      "url": "https://arxiv.org",
+      "currentPath": ["Reading", "Papers"]
+    }
+  ],
+  "tags": ["already-organized", "no-op", "idempotency"]
+}

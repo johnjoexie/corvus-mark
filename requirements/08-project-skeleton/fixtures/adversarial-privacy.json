@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "1.0",
+  "id": "fixture_adversarial_privacy",
+  "name": "Adversarial privacy canaries",
+  "locale": "mixed",
+  "bookmarks": [
+    {
+      "id": "adv-1",
+      "title": "Do not leak api_key=sk-testsecret000000000000",
+      "url": "https://docs.example.com/private?token=secret#session",
+      "currentPath": ["Bookmarks Bar", "Inbox"]
+    },
+    {
+      "id": "adv-2",
+      "title": "javascript URL is never outbound",
+      "url": "javascript:alert(document.cookie)",
+      "currentPath": ["Bookmarks Bar", "Inbox"]
+    },
+    {
+      "id": "adv-3",
+      "title": "data URL is never outbound",
+      "url": "data:text/plain,Authorization:%20Bearer%20secret",
+      "currentPath": ["Bookmarks Bar", "Inbox"]
+    }
+  ],
+  "tags": ["adversarial", "privacy", "fail-closed"]
+}

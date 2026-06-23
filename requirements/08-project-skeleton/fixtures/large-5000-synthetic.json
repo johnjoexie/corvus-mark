@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1.0",
+  "id": "fixture_large_5000_synthetic",
+  "name": "Large 5000 synthetic bookmark generator",
+  "locale": "en",
+  "generator": {
+    "count": 5000,
+    "titlePrefix": "Synthetic bookmark",
+    "host": "docs.example.com",
+    "pathPrefix": "article",
+    "currentPath": ["Bookmarks Bar", "Large Import"]
+  },
+  "tags": ["large-5000", "synthetic", "batching", "storage", "resumability"]
+}

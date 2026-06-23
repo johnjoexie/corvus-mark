@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "1.0",
+  "id": "fixture_dup_urls",
+  "name": "Duplicate URL identity sample",
+  "locale": "en",
+  "bookmarks": [
+    {
+      "id": "dup-1",
+      "title": "Video v AAA",
+      "url": "https://example.com/watch?v=AAA&utm_source=mail",
+      "currentPath": ["Bookmarks Bar", "Inbox"]
+    },
+    {
+      "id": "dup-2",
+      "title": "Video v BBB",
+      "url": "https://example.com/watch?v=BBB&utm_source=mail",
+      "currentPath": ["Bookmarks Bar", "Inbox"]
+    },
+    {
+      "id": "dup-3",
+      "title": "Video v AAA tracking noise",
+      "url": "https://example.com/watch?utm_campaign=spring&v=AAA&utm_source=mail",
+      "currentPath": ["Bookmarks Bar", "Inbox"]
+    }
+  ],
+  "tags": ["dup-urls", "identity", "privacy"]
+}

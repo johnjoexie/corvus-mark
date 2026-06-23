@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "1.0",
+  "id": "fixture_deep_nested",
+  "name": "Deep nested bookmark tree sample",
+  "locale": "en",
+  "bookmarks": [
+    {
+      "id": "deep-1",
+      "title": "React Compiler",
+      "url": "https://react.dev/learn/react-compiler",
+      "currentPath": ["Bookmarks Bar", "Work", "Frontend", "React", "Compiler"]
+    },
+    {
+      "id": "deep-2",
+      "title": "Arxiv paper",
+      "url": "https://arxiv.org/abs/2401.00001",
+      "currentPath": ["Other Bookmarks", "Research", "AI", "Papers", "Queue"]
+    }
+  ],
+  "tags": ["deep-nested", "idempotency"]
+}

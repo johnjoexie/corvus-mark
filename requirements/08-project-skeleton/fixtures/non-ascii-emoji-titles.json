@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "1.0",
+  "id": "fixture_non_ascii_emoji_titles",
+  "name": "Non-ASCII and emoji title sample",
+  "locale": "mixed",
+  "bookmarks": [
+    {
+      "id": "i18n-1",
+      "title": "前端文档 📘",
+      "url": "https://react.dev/learn",
+      "currentPath": ["Bookmarks Bar", "待读"]
+    },
+    {
+      "id": "i18n-2",
+      "title": "研究论文 🧪",
+      "url": "https://arxiv.org/abs/2501.12345",
+      "currentPath": ["Other Bookmarks", "论文"]
+    },
+    {
+      "id": "i18n-3",
+      "title": "動画メモ 🎬",
+      "url": "https://youtube.com/watch?v=abc123",
+      "currentPath": ["Bookmarks Bar", "メディア"]
+    }
+  ],
+  "tags": ["non-ascii", "emoji", "i18n"]
+}
