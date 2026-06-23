@@ -69,13 +69,13 @@ export async function applySelectedPlanItems(input: ApplySelectedPlanItemsInput)
       await input.moveLogStore.saveMoveLog(moveLog)
       continue
     }
-    if (current.parentId !== item.expectedParentId) {
-      logItem.status = 'skipped_stale_moved'
+    if (current.parentId === newParentId) {
+      logItem.status = 'already_satisfied'
       await input.moveLogStore.saveMoveLog(moveLog)
       continue
     }
-    if (current.parentId === newParentId) {
-      logItem.status = 'already_satisfied'
+    if (current.parentId !== item.expectedParentId) {
+      logItem.status = 'skipped_stale_moved'
       await input.moveLogStore.saveMoveLog(moveLog)
       continue
     }

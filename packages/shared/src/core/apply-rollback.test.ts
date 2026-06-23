@@ -6,6 +6,7 @@ import type { OrganizePlan } from '../schema/organize-plan'
 class MemoryBookmarkManager implements BookmarkManagerPort {
   nodes = new Map<string, BrowserBookmarkTreeNode>()
   operations: string[] = []
+  failMoveIds = new Set<string>()
 
   constructor(nodes: BrowserBookmarkTreeNode[]) {
     nodes.forEach((node) => this.nodes.set(node.id, { ...node }))
@@ -25,6 +26,7 @@ class MemoryBookmarkManager implements BookmarkManagerPort {
 
   async moveBookmark(id: string, target: { parentId: string }): Promise<BrowserBookmarkTreeNode> {
     this.operations.push(`move:${id}`)
+    if (this.failMoveIds.has(id)) throw new Error(`injected move failure: ${id}`)
     const node = this.nodes.get(id)
     if (!node) throw new Error('missing bookmark')
     const moved = { ...node, parentId: target.parentId }
@@ -79,6 +81,24 @@ const plan: OrganizePlan = {
   ],
 }
 
+function buildTwoItemPlan(): OrganizePlan {
+  return {
+    ...plan,
+    stats: { ...plan.stats, totalItems: 2, moveItems: 2 },
+    items: [
+      plan.items[0]!,
+      {
+        ...plan.items[0]!,
+        bookmarkId: 'b2',
+        title: 'TypeScript',
+        sanitizedUrl: 'https://typescriptlang.org',
+        urlKeyHash: 'hash_2',
+        hostKey: 'typescriptlang.org',
+      },
+    ],
+  }
+}
+
 describe('applySelectedPlanItems', () => {
   it('persists MoveLog before moving a bookmark', async () => {
     const bookmarks = new MemoryBookmarkManager([
@@ -123,21 +143,7 @@ describe('applySelectedPlanItems', () => {
       { id: 'b1', parentId: 'old', title: 'React', url: 'https://react.dev' },
       { id: 'b2', parentId: 'old', title: 'TypeScript', url: 'https://typescriptlang.org' },
     ])
-    const twoItemPlan: OrganizePlan = {
-      ...plan,
-      stats: { ...plan.stats, totalItems: 2, moveItems: 2 },
-      items: [
-        plan.items[0]!,
-        {
-          ...plan.items[0]!,
-          bookmarkId: 'b2',
-          title: 'TypeScript',
-          sanitizedUrl: 'https://typescriptlang.org',
-          urlKeyHash: 'hash_2',
-          hostKey: 'typescriptlang.org',
-        },
-      ],
-    }
+    const twoItemPlan = buildTwoItemPlan()
 
     await applySelectedPlanItems({
       plan: twoItemPlan,
@@ -152,6 +158,56 @@ describe('applySelectedPlanItems', () => {
     })
 
     expect(bookmarks.operations).toEqual(['resolve:b1', 'resolve:b2', 'move:b1', 'move:b2'])
+  })
+
+  it('keeps a truthful MoveLog when a later move fails so successful moves can roll back', async () => {
+    const bookmarks = new MemoryBookmarkManager([
+      { id: 'b1', parentId: 'old', title: 'React', url: 'https://react.dev' },
+      { id: 'b2', parentId: 'old', title: 'TypeScript', url: 'https://typescriptlang.org' },
+    ])
+    bookmarks.failMoveIds.add('b2')
+
+    const moveLog = await applySelectedPlanItems({
+      plan: buildTwoItemPlan(),
+      bookmarkManager: bookmarks,
+      moveLogStore: new MemoryMoveLogStore(),
+      resolveTargetParentId: async (item) => `new_${item.bookmarkId}`,
+      createdAt: '2026-06-05T00:01:00.000Z',
+      moveLogId: 'move_1',
+    })
+
+    expect(moveLog.status).toBe('partial_failed')
+    expect(moveLog.items.map((item) => item.status)).toEqual(['success', 'failed'])
+    expect(bookmarks.nodes.get('b1')?.parentId).toBe('new_b1')
+    expect(bookmarks.nodes.get('b2')?.parentId).toBe('old')
+
+    const rolledBack = await rollbackMoveLog({
+      moveLog,
+      bookmarkManager: bookmarks,
+      moveLogStore: new MemoryMoveLogStore(),
+    })
+
+    expect(rolledBack.items.map((item) => item.status)).toEqual(['rolled_back', 'failed'])
+    expect(bookmarks.nodes.get('b1')?.parentId).toBe('old')
+    expect(bookmarks.nodes.get('b2')?.parentId).toBe('old')
+  })
+
+  it('marks an already-applied item as already_satisfied when re-running the same plan', async () => {
+    const bookmarks = new MemoryBookmarkManager([
+      { id: 'b1', parentId: 'new', title: 'React', url: 'https://react.dev' },
+    ])
+
+    const moveLog = await applySelectedPlanItems({
+      plan,
+      bookmarkManager: bookmarks,
+      moveLogStore: new MemoryMoveLogStore(),
+      resolveTargetParentId: async () => 'new',
+      createdAt: '2026-06-05T00:01:00.000Z',
+      moveLogId: 'move_1',
+    })
+
+    expect(moveLog.items[0]?.status).toBe('already_satisfied')
+    expect(bookmarks.operations).not.toContain('move:b1')
   })
 })
 
