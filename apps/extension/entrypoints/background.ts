@@ -2,10 +2,12 @@ import {
   OpenAiCompatibleProvider,
   acquireTaskLock,
   buildDefaultRulePack,
+  buildClassificationBatches,
   buildOrganizePlan,
   classifyByDefaultDirectory,
   createCorvusId,
   flattenBookmarkTree,
+  mergeBatchAssignmentsWithFallback,
   nowIso,
   recordTraceEvent,
   releaseTaskLock,
@@ -13,6 +15,7 @@ import {
   rollbackMoveLog,
   sanitizeUrl,
   type TaskLock,
+  type AiAssignment,
   type MoveLog,
   type NormalizedBookmark,
   type OrganizePlan,
@@ -156,8 +159,6 @@ async function buildPreviewPlan(): Promise<{ plan: OrganizePlan; degraded: boole
   const rulePack = buildDefaultRulePack()
   const runId = createCorvusId('run')
   const traceId = createCorvusId('trace')
-  const refs = new Map<string, string>()
-  bookmarks.forEach((bookmark, index) => refs.set(`b${index}`, bookmark.id))
 
   let assignments = bookmarks.map((bookmark, index) => {
     const fallback = classifyByDefaultDirectory({ hostKey: bookmark.hostKey }, rulePack)
@@ -173,40 +174,81 @@ async function buildPreviewPlan(): Promise<{ plan: OrganizePlan; degraded: boole
 
   const apiKey = await secretStore.getSecret(settings.provider)
   if (apiKey && bookmarks.length > 0) {
-    const envelope = {
-      schemaVersion: 1 as const,
-      envelopeId: createCorvusId('evt'),
-      runId,
-      traceId,
-      createdAt: nowIso(),
-      task: 'classify_bookmarks' as const,
-      locale: 'en',
-      directory: {
-        mode: 'fallback' as const,
-        allowedRoots: ['Bookmarks Bar', 'Other Bookmarks'],
-        existingPaths: [],
-        maxDepth: rulePack.maxDepth,
-        maxNewFolders: rulePack.maxNewFolders,
-      },
-      items: bookmarks.slice(0, 80).map((bookmark, index) => ({
-        ref: `b${index}`,
-        title: bookmark.title,
-        sanitizedUrl: bookmark.sanitizedUrl,
-        hostKey: bookmark.hostKey,
-        currentPath: bookmark.currentPath,
-      })),
-      budget: { maxItems: 80, maxOutputTokens: 4096 },
-    }
     const provider = new OpenAiCompatibleProvider({
       baseUrl: settings.baseUrl,
       model: settings.model,
       apiKey,
     })
-    const response = await provider.classifyBookmarks(envelope)
-    assignments = response.assignments
+    const batches = buildClassificationBatches(bookmarks, 80)
+    const assignmentsByBatch: AiAssignment[][] = []
+    for (const [batchIndex, batch] of batches.entries()) {
+      const envelope = {
+        schemaVersion: 1 as const,
+        envelopeId: createCorvusId('evt'),
+        runId,
+        traceId,
+        createdAt: nowIso(),
+        task: 'classify_bookmarks' as const,
+        locale: 'en',
+        directory: {
+          mode: 'fallback' as const,
+          allowedRoots: ['Bookmarks Bar', 'Other Bookmarks'],
+          existingPaths: [],
+          maxDepth: rulePack.maxDepth,
+          maxNewFolders: rulePack.maxNewFolders,
+        },
+        items: batch.items,
+        budget: { maxItems: 80, maxOutputTokens: 4096 },
+      }
+      const response = await provider.classifyBookmarks(envelope)
+      assignmentsByBatch[batchIndex] = response.assignments
+    }
+    const merged = mergeBatchAssignmentsWithFallback({
+      batches,
+      assignmentsByBatch,
+      fallbackForBookmark: (bookmark) => {
+        const fallback = classifyByDefaultDirectory({ hostKey: bookmark.hostKey }, rulePack)
+        return {
+          targetPath: fallback.targetPath,
+          confidence: fallback.confidence,
+          reason: fallback.reason,
+          isNewFolder: false,
+        }
+      },
+    })
     degraded = false
+    const plan = buildOrganizePlan({
+      runId,
+      traceId,
+      planId: createCorvusId('plan'),
+      createdAt: nowIso(),
+      bookmarks,
+      assignments: merged.assignments,
+      refToBookmarkId: merged.refToBookmarkId,
+      autoSelectConfidenceThreshold: rulePack.autoSelectConfidenceThreshold,
+      newFolderConfidenceThreshold: rulePack.newFolderConfidenceThreshold,
+      maxDepth: rulePack.maxDepth,
+      maxNewFolders: rulePack.maxNewFolders,
+    })
+    await browser.storage.local.set({ [LAST_PLAN_KEY]: plan })
+    await recordRuntimeTrace({
+      traceId,
+      runId,
+      phase: 'preview',
+      level: 'info',
+      message: 'preview built with provider',
+      metadata: {
+        itemCount: plan.items.length,
+        moveItems: plan.stats.moveItems,
+        blockedItems: plan.stats.blockedItems,
+        degraded,
+      },
+    })
+    return { plan, degraded }
   }
 
+  const refs = new Map<string, string>()
+  bookmarks.forEach((bookmark, index) => refs.set(`b${index}`, bookmark.id))
   const plan = buildOrganizePlan({
     runId,
     traceId,
