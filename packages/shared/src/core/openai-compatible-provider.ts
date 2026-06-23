@@ -19,6 +19,14 @@ export const deepSeekPreset = {
   model: 'deepseek-chat',
 } as const
 
+function mapProviderStatus(status: number): string {
+  if (status === 401 || status === 403) return 'auth'
+  if (status === 429) return 'rate_limit'
+  if (status === 408 || status === 504) return 'timeout'
+  if (status >= 500) return 'network'
+  return String(status)
+}
+
 export class OpenAiCompatibleProvider implements LlmProviderPort {
   private readonly fetchFn: typeof fetch
 
@@ -51,12 +59,16 @@ export class OpenAiCompatibleProvider implements LlmProviderPort {
     })
 
     if (!response.ok) {
-      throw new Error(`provider_error:${response.status}`)
+      throw new Error(`provider_error:${mapProviderStatus(response.status)}`)
     }
 
     const json = (await response.json()) as ChatCompletionResponse
     const content = json.choices?.[0]?.message?.content
     if (!content) throw new Error('provider_error:empty_content')
-    return parseAiResponse(JSON.parse(content))
+    try {
+      return parseAiResponse(JSON.parse(content))
+    } catch {
+      throw new Error('provider_error:bad_json')
+    }
   }
 }

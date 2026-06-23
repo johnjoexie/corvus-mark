@@ -66,4 +66,73 @@ describe('OpenAiCompatibleProvider', () => {
     expect(deepSeekPreset.baseUrl).toBe('https://api.deepseek.com')
     expect(deepSeekPreset.model).toBeTruthy()
   })
+
+  it('maps auth failures to the auth taxonomy code', async () => {
+    const provider = new OpenAiCompatibleProvider({
+      baseUrl: 'https://api.deepseek.com',
+      model: 'deepseek-chat',
+      apiKey: '<API_KEY>',
+      fetch: async () => new Response('{}', { status: 401 }),
+    })
+
+    await expect(provider.classifyBookmarks(validEnvelope())).rejects.toThrow('provider_error:auth')
+  })
+
+  it('maps rate limits to the rate_limit taxonomy code', async () => {
+    const provider = new OpenAiCompatibleProvider({
+      baseUrl: 'https://api.deepseek.com',
+      model: 'deepseek-chat',
+      apiKey: '<API_KEY>',
+      fetch: async () => new Response('{}', { status: 429 }),
+    })
+
+    await expect(provider.classifyBookmarks(validEnvelope())).rejects.toThrow(
+      'provider_error:rate_limit',
+    )
+  })
+
+  it('maps invalid model JSON to the bad_json taxonomy code', async () => {
+    const provider = new OpenAiCompatibleProvider({
+      baseUrl: 'https://api.deepseek.com',
+      model: 'deepseek-chat',
+      apiKey: '<API_KEY>',
+      fetch: async () =>
+        new Response(JSON.stringify({ choices: [{ message: { content: '{not-json' } }] }), {
+          status: 200,
+        }),
+    })
+
+    await expect(provider.classifyBookmarks(validEnvelope())).rejects.toThrow(
+      'provider_error:bad_json',
+    )
+  })
 })
+
+function validEnvelope() {
+  return {
+    schemaVersion: 1 as const,
+    envelopeId: 'evt_1',
+    runId: 'run_1',
+    traceId: 'trace_1',
+    createdAt: '2026-06-05T00:00:00.000Z',
+    task: 'classify_bookmarks' as const,
+    locale: 'en',
+    directory: {
+      mode: 'fallback' as const,
+      allowedRoots: ['Bookmarks Bar'],
+      existingPaths: [],
+      maxDepth: 3,
+      maxNewFolders: 12,
+    },
+    items: [
+      {
+        ref: 'b0',
+        title: 'React',
+        sanitizedUrl: 'https://react.dev',
+        hostKey: 'react.dev',
+        currentPath: ['Dev'],
+      },
+    ],
+    budget: { maxItems: 80, maxOutputTokens: 4096 },
+  }
+}
