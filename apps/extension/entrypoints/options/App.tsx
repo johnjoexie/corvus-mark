@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { browser } from 'wxt/browser'
 import type { BackgroundRequest, BackgroundResponse, ProviderSettings } from '../../lib/messages'
+import { ApiKeyField } from './api-key-field'
 
 export function App() {
   const [settings, setSettings] = useState<ProviderSettings>({
@@ -9,7 +10,7 @@ export function App() {
     model: 'deepseek-chat',
     apiKeyMasked: '',
   })
-  const [apiKey, setApiKey] = useState('')
+  const apiKeyInputRef = useRef<HTMLInputElement>(null)
   const [status, setStatus] = useState('')
 
   useEffect(() => {
@@ -21,6 +22,7 @@ export function App() {
   }, [])
 
   async function save() {
+    const apiKey = apiKeyInputRef.current?.value.trim()
     const response = await browser.runtime.sendMessage<BackgroundRequest, BackgroundResponse>({
       type: 'save-settings',
       settings: {
@@ -32,7 +34,7 @@ export function App() {
     })
     if (response.ok && 'settings' in response) {
       setSettings(response.settings)
-      setApiKey('')
+      if (apiKeyInputRef.current) apiKeyInputRef.current.value = ''
       setStatus('Saved locally')
     } else {
       setStatus(response.ok ? 'Saved' : response.error)
@@ -71,16 +73,7 @@ export function App() {
           style={{ display: 'block', width: '100%', marginTop: 4 }}
         />
       </label>
-      <label style={{ display: 'block', marginBottom: 12 }}>
-        API key
-        <input
-          type="password"
-          value={apiKey}
-          placeholder={settings.apiKeyMasked || 'Not set'}
-          onChange={(event) => setApiKey(event.target.value)}
-          style={{ display: 'block', width: '100%', marginTop: 4 }}
-        />
-      </label>
+      <ApiKeyField inputRef={apiKeyInputRef} apiKeyMasked={settings.apiKeyMasked} />
       <button type="button" onClick={() => void save()}>
         Save
       </button>
