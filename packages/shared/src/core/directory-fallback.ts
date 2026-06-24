@@ -73,6 +73,10 @@ export function buildDefaultRulePack(): RulePack {
   }
 }
 
+export function deriveAllowedTargetRoots(rulePack: RulePack): string[] {
+  return [...new Set(rulePack.seedPaths.map((path) => path[0]).filter((root): root is string => Boolean(root)))]
+}
+
 export function classifyByDefaultDirectory(
   input: FallbackInput,
   rulePack: RulePack,

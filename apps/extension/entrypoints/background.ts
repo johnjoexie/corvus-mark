@@ -7,6 +7,7 @@ import {
   classifyByDefaultDirectory,
   createCorvusId,
   createClassificationRunState,
+  deriveAllowedTargetRoots,
   flattenBookmarkTree,
   mergeBatchAssignmentsWithFallback,
   nowIso,
@@ -163,7 +164,7 @@ async function buildPreviewPlan(): Promise<{ plan: OrganizePlan; degraded: boole
   const rulePack = buildDefaultRulePack()
   let runId = createCorvusId('run')
   let traceId = createCorvusId('trace')
-  const allowedRoots = ['Bookmarks Bar', 'Other Bookmarks']
+  const allowedRoots = deriveAllowedTargetRoots(rulePack)
 
   let assignments = bookmarks.map((bookmark, index) => {
     const fallback = classifyByDefaultDirectory({ hostKey: bookmark.hostKey }, rulePack)

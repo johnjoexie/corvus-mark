@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { buildDefaultRulePack, classifyByDefaultDirectory } from './directory-fallback'
+import {
+  buildDefaultRulePack,
+  classifyByDefaultDirectory,
+  deriveAllowedTargetRoots,
+} from './directory-fallback'
 import { sanitizeUrl } from '../schema/url'
 
 describe('classifyByDefaultDirectory', () => {
@@ -48,5 +52,23 @@ describe('classifyByDefaultDirectory', () => {
       classifications.filter((classification) => !seedKeys.has(classification.targetPath.join('/'))),
     ).toHaveLength(0)
     expect(rulePack.maxNewFolders).toBeLessThanOrEqual(12)
+  })
+
+  it('derives allowed target roots from the seed taxonomy', () => {
+    const rulePack = buildDefaultRulePack()
+
+    expect(deriveAllowedTargetRoots(rulePack)).toEqual([
+      'Dev',
+      'Reading',
+      'Media',
+      'Shopping',
+      'News',
+      'Social',
+      'Finance',
+      'Work',
+      'Personal',
+      'Reference',
+      'Uncategorized',
+    ])
   })
 })
