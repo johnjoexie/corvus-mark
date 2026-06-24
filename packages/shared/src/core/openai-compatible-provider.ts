@@ -50,7 +50,7 @@ export class OpenAiCompatibleProvider implements LlmProviderPort {
           {
             role: 'system',
             content:
-              'Return only JSON matching the AiResponseEnvelope schema. Never output URLs or secrets.',
+              'Return only JSON matching this exact shape: {"schemaVersion":1,"envelopeId":string,"assignments":[{"ref":string,"targetPath":string[],"confidence":number,"reason":string,"isNewFolder":boolean}]}. Never output URLs or secrets.',
           },
           { role: 'user', content: JSON.stringify(envelope) },
         ],

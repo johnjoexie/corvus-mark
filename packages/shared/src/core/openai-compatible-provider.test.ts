@@ -10,6 +10,7 @@ describe('OpenAiCompatibleProvider', () => {
       fetch: async (_url, init) => {
         const body = JSON.parse(String(init?.body))
         expect(body.model).toBe('deepseek-chat')
+        expect(body.messages[0].content).toContain('"assignments"')
         expect(JSON.stringify(body)).not.toContain('rawUrl')
         return new Response(
           JSON.stringify({
