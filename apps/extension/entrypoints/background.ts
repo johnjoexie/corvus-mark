@@ -13,6 +13,8 @@ import {
   nowIso,
   recordTraceEvent,
   releaseTaskLock,
+  estimatePreviewCost,
+  isPreviewCostConfirmed,
   resumeClassificationBatches,
   resolveTargetParentId as resolveTargetFolderParentId,
   rollbackMoveLog,
@@ -24,6 +26,8 @@ import {
   type OrganizePlan,
   type TraceEvent,
   type ClassificationRunState,
+  type PreviewCostConfirmation,
+  type PreviewCostEstimate,
 } from '@corvus-mark/shared'
 import { browser } from 'wxt/browser'
 import { applySelectedPlanItems } from '@corvus-mark/shared'
@@ -39,6 +43,8 @@ const TRACE_EVENTS_KEY = 'runtime:traceEvents'
 const TASK_LOCK_KEY = 'taskLock'
 const URL_SALT_KEY = 'policy:urlSalt'
 const TASK_LOCK_TTL_MS = 120000
+const CLASSIFICATION_BATCH_SIZE = 80
+const CLASSIFICATION_MAX_OUTPUT_TOKENS = 4096
 
 const defaultSettings: Omit<ProviderSettings, 'apiKeyMasked'> = {
   provider: 'deepseek',
@@ -158,9 +164,24 @@ async function withBookmarkTaskLock<T>(kind: TaskLock['kind'], run: () => Promis
   }
 }
 
-async function buildPreviewPlan(): Promise<{ plan: OrganizePlan; degraded: boolean }> {
+async function estimateCurrentPreviewCost(bookmarks?: NormalizedBookmark[]): Promise<PreviewCostEstimate> {
+  const settings = await getProviderSettings()
+  const normalized = bookmarks ?? (await normalizeBookmarks())
+  const apiKey = await secretStore.getSecret(settings.provider)
+  return estimatePreviewCost({
+    itemCount: normalized.length,
+    batchSize: CLASSIFICATION_BATCH_SIZE,
+    maxOutputTokensPerRequest: CLASSIFICATION_MAX_OUTPUT_TOKENS,
+    hasProviderKey: Boolean(apiKey),
+  })
+}
+
+async function buildPreviewPlan(input: {
+  costConfirmation?: PreviewCostConfirmation
+} = {}): Promise<{ plan: OrganizePlan; degraded: boolean }> {
   const settings = await getProviderSettings()
   const bookmarks = await normalizeBookmarks()
+  const costEstimate = await estimateCurrentPreviewCost(bookmarks)
   const rulePack = buildDefaultRulePack()
   let runId = createCorvusId('run')
   let traceId = createCorvusId('trace')
@@ -180,12 +201,15 @@ async function buildPreviewPlan(): Promise<{ plan: OrganizePlan; degraded: boole
 
   const apiKey = await secretStore.getSecret(settings.provider)
   if (apiKey && bookmarks.length > 0) {
+    if (!isPreviewCostConfirmed(costEstimate, input.costConfirmation)) {
+      throw new Error('preview cost confirmation required')
+    }
     const provider = new OpenAiCompatibleProvider({
       baseUrl: settings.baseUrl,
       model: settings.model,
       apiKey,
     })
-    const batches = buildClassificationBatches(bookmarks, 80)
+    const batches = buildClassificationBatches(bookmarks, CLASSIFICATION_BATCH_SIZE)
     const stored = await browser.storage.local.get(CLASSIFICATION_RUN_KEY)
     const storedState = stored[CLASSIFICATION_RUN_KEY] as ClassificationRunState | undefined
     const runState =
@@ -222,7 +246,7 @@ async function buildPreviewPlan(): Promise<{ plan: OrganizePlan; degraded: boole
           maxNewFolders: rulePack.maxNewFolders,
         },
         items: batch.items,
-        budget: { maxItems: 80, maxOutputTokens: 4096 },
+        budget: { maxItems: CLASSIFICATION_BATCH_SIZE, maxOutputTokens: CLASSIFICATION_MAX_OUTPUT_TOKENS },
       }
       const response = await provider.classifyBookmarks(envelope)
         return response.assignments
@@ -323,8 +347,11 @@ async function handleMessage(request: BackgroundRequest): Promise<BackgroundResp
       if (request.apiKey) await secretStore.setSecret(request.settings.provider, request.apiKey)
       return { ok: true, settings: await getProviderSettings() }
     }
+    if (request.type === 'estimate-preview-cost') {
+      return { ok: true, estimate: await estimateCurrentPreviewCost() }
+    }
     if (request.type === 'preview-plan') {
-      const result = await buildPreviewPlan()
+      const result = await buildPreviewPlan({ costConfirmation: request.costConfirmation })
       return { ok: true, ...result }
     }
     if (request.type === 'apply-plan') {

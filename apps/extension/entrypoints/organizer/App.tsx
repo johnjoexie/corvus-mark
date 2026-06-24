@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { MoveLog, OrganizePlan } from '@corvus-mark/shared'
+import type { MoveLog, OrganizePlan, PreviewCostEstimate } from '@corvus-mark/shared'
 import { browser } from 'wxt/browser'
 import type { BackgroundRequest, BackgroundResponse } from '../../lib/messages'
 import {
@@ -13,17 +13,38 @@ export function App() {
   const [moveLog, setMoveLog] = useState<MoveLog | undefined>()
   const [status, setStatus] = useState('Ready')
   const [confirmation, setConfirmation] = useState<ApplyConfirmation | undefined>()
+  const [previewCost, setPreviewCost] = useState<PreviewCostEstimate | undefined>()
 
   async function send(request: BackgroundRequest): Promise<BackgroundResponse> {
     return browser.runtime.sendMessage<BackgroundRequest, BackgroundResponse>(request)
   }
 
   async function preview() {
+    if (!previewCost) {
+      setStatus('Estimating preview cost...')
+      const estimateResponse = await send({ type: 'estimate-preview-cost' })
+      if (!estimateResponse.ok || !('estimate' in estimateResponse)) {
+        setStatus(estimateResponse.ok ? 'Unable to estimate preview cost' : estimateResponse.error)
+        return
+      }
+      if (estimateResponse.estimate.requiresNetworkConfirmation) {
+        setPreviewCost(estimateResponse.estimate)
+        setStatus(
+          `Confirm AI preview: ${estimateResponse.estimate.estimatedRequestCount} request(s), up to ${estimateResponse.estimate.estimatedMaxTokens} output tokens`,
+        )
+        return
+      }
+      setPreviewCost(estimateResponse.estimate)
+    }
     setStatus('Building preview...')
-    const response = await send({ type: 'preview-plan' })
+    const response = await send({
+      type: 'preview-plan',
+      costConfirmation: previewCost ? { confirmationId: previewCost.confirmationId } : undefined,
+    })
     if (response.ok && 'plan' in response) {
       setPlan(response.plan)
       setConfirmation(undefined)
+      setPreviewCost(undefined)
       setStatus(response.degraded ? 'Preview built with offline fallback' : 'Preview built with AI')
     } else {
       setStatus(response.ok ? 'Preview built' : response.error)
@@ -65,7 +86,7 @@ export function App() {
       <h1 style={{ fontSize: 20 }}>Organizer</h1>
       <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
         <button type="button" onClick={() => void preview()}>
-          Generate preview
+          {previewCost?.requiresNetworkConfirmation ? 'Confirm AI preview' : 'Generate preview'}
         </button>
         <button type="button" disabled={!plan} onClick={() => void apply()}>
           {plan && confirmation ? 'Confirm apply' : 'Apply selected'}
