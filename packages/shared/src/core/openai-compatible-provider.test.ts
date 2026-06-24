@@ -91,6 +91,48 @@ describe('OpenAiCompatibleProvider', () => {
     )
   })
 
+  it('maps timeout statuses to the timeout taxonomy code', async () => {
+    const provider = new OpenAiCompatibleProvider({
+      baseUrl: 'https://api.deepseek.com',
+      model: 'deepseek-chat',
+      apiKey: '<API_KEY>',
+      fetch: async () => new Response('{}', { status: 504 }),
+    })
+
+    await expect(provider.classifyBookmarks(validEnvelope())).rejects.toThrow(
+      'provider_error:timeout',
+    )
+  })
+
+  it('maps server failures to the network taxonomy code', async () => {
+    const provider = new OpenAiCompatibleProvider({
+      baseUrl: 'https://api.deepseek.com',
+      model: 'deepseek-chat',
+      apiKey: '<API_KEY>',
+      fetch: async () => new Response('{}', { status: 500 }),
+    })
+
+    await expect(provider.classifyBookmarks(validEnvelope())).rejects.toThrow(
+      'provider_error:network',
+    )
+  })
+
+  it('maps empty model content to the empty_content taxonomy code', async () => {
+    const provider = new OpenAiCompatibleProvider({
+      baseUrl: 'https://api.deepseek.com',
+      model: 'deepseek-chat',
+      apiKey: '<API_KEY>',
+      fetch: async () =>
+        new Response(JSON.stringify({ choices: [{ message: { content: '' } }] }), {
+          status: 200,
+        }),
+    })
+
+    await expect(provider.classifyBookmarks(validEnvelope())).rejects.toThrow(
+      'provider_error:empty_content',
+    )
+  })
+
   it('maps invalid model JSON to the bad_json taxonomy code', async () => {
     const provider = new OpenAiCompatibleProvider({
       baseUrl: 'https://api.deepseek.com',
