@@ -6,11 +6,13 @@ import {
   buildOrganizePlan,
   classifyByDefaultDirectory,
   createCorvusId,
+  createClassificationRunState,
   flattenBookmarkTree,
   mergeBatchAssignmentsWithFallback,
   nowIso,
   recordTraceEvent,
   releaseTaskLock,
+  resumeClassificationBatches,
   resolveTargetParentId as resolveTargetFolderParentId,
   rollbackMoveLog,
   sanitizeUrl,
@@ -20,6 +22,7 @@ import {
   type NormalizedBookmark,
   type OrganizePlan,
   type TraceEvent,
+  type ClassificationRunState,
 } from '@corvus-mark/shared'
 import { browser } from 'wxt/browser'
 import { applySelectedPlanItems } from '@corvus-mark/shared'
@@ -30,6 +33,7 @@ import type { BackgroundRequest, BackgroundResponse, ProviderSettings } from '..
 const SETTINGS_KEY = 'settings:provider'
 const LAST_PLAN_KEY = 'runtime:lastPlan'
 const LAST_MOVE_LOG_KEY = 'runtime:lastMoveLog'
+const CLASSIFICATION_RUN_KEY = 'runtime:classificationRun'
 const TRACE_EVENTS_KEY = 'runtime:traceEvents'
 const TASK_LOCK_KEY = 'taskLock'
 const URL_SALT_KEY = 'policy:urlSalt'
@@ -157,8 +161,8 @@ async function buildPreviewPlan(): Promise<{ plan: OrganizePlan; degraded: boole
   const settings = await getProviderSettings()
   const bookmarks = await normalizeBookmarks()
   const rulePack = buildDefaultRulePack()
-  const runId = createCorvusId('run')
-  const traceId = createCorvusId('trace')
+  let runId = createCorvusId('run')
+  let traceId = createCorvusId('trace')
   const allowedRoots = ['Bookmarks Bar', 'Other Bookmarks']
 
   let assignments = bookmarks.map((bookmark, index) => {
@@ -181,8 +185,26 @@ async function buildPreviewPlan(): Promise<{ plan: OrganizePlan; degraded: boole
       apiKey,
     })
     const batches = buildClassificationBatches(bookmarks, 80)
-    const assignmentsByBatch: AiAssignment[][] = []
-    for (const [batchIndex, batch] of batches.entries()) {
+    const stored = await browser.storage.local.get(CLASSIFICATION_RUN_KEY)
+    const storedState = stored[CLASSIFICATION_RUN_KEY] as ClassificationRunState | undefined
+    const runState =
+      storedState?.status !== 'done' &&
+      storedState?.batchTotal === batches.length &&
+      storedState?.itemTotal === bookmarks.length
+        ? storedState
+        : createClassificationRunState({
+            runId,
+            traceId,
+            batchTotal: batches.length,
+            itemTotal: bookmarks.length,
+            now: nowIso(),
+          })
+    runId = runState.id
+    traceId = runState.traceId
+    const resumed = await resumeClassificationBatches({
+      state: runState,
+      batches,
+      classifyBatch: async (batch) => {
       const envelope = {
         schemaVersion: 1 as const,
         envelopeId: createCorvusId('evt'),
@@ -202,8 +224,16 @@ async function buildPreviewPlan(): Promise<{ plan: OrganizePlan; degraded: boole
         budget: { maxItems: 80, maxOutputTokens: 4096 },
       }
       const response = await provider.classifyBookmarks(envelope)
-      assignmentsByBatch[batchIndex] = response.assignments
-    }
+        return response.assignments
+      },
+      saveState: async (next) => {
+        await browser.storage.local.set({ [CLASSIFICATION_RUN_KEY]: next })
+      },
+      now: nowIso,
+    })
+    const assignmentsByBatch: AiAssignment[][] = resumed.state.completedBatches.map(
+      (batch) => batch.assignments,
+    )
     const merged = mergeBatchAssignmentsWithFallback({
       batches,
       assignmentsByBatch,
